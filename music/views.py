@@ -101,3 +101,23 @@ def list_favorites(request):
         for fav in favorites
     ]
     return Response({"favorites": data})
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_favorite(request, song_id):
+    try:
+        favorite = Favorite.objects.get(user=request.user, id=song_id)
+        favorite.delete()
+        return Response({"message": "Removed from favorites."})
+    except Favorite.DoesNotExist:
+        return Response({"error": "Song not found in favorites."}, status=404)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def search_favorites(request):
+    query = request.GET.get('q', '')
+    favorites = Favorite.objects.filter(user=request.user, song__icontains=query)
+    data = [{"song": f.song, "artist": f.artist, "album": f.album} for f in favorites]
+    return Response(data)
