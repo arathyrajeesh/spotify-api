@@ -1,8 +1,13 @@
 import base64
 import requests
 from django.conf import settings
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated
+from .models import Favorite
+from .serializers import FavoriteSerializer
+
 
 # --- Get Spotify Access Token ---
 def get_spotify_token():
@@ -66,3 +71,22 @@ def search_song(request):
 
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+
+# --- Add Favorite Song (Authenticated) ---
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def add_favorite(request):
+    user = request.user
+    serializer = FavoriteSerializer(data=request.data)
+
+    if serializer.is_valid():
+        # Check if already added
+        if Favorite.objects.filter(user=user, song=serializer.validated_data['song']).exists():
+            return Response({"message": "This song is already in your favorites."}, status=status.HTTP_200_OK)
+
+        serializer.save(user=user)
+        return Response({"message": "Song added to favorites successfully!"}, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
