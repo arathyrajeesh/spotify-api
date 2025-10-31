@@ -90,3 +90,14 @@ def add_favorite(request):
         return Response({"message": "Song added to favorites successfully!"}, status=status.HTTP_201_CREATED)
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_favorites(request):
+    favorites = Favorite.objects.filter(user=request.user)
+    data = [
+        {"song": fav.song, "artist": fav.artist}
+        for fav in favorites
+    ]
+    return Response({"favorites": data})
