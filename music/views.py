@@ -97,13 +97,4 @@ def list_favorites(request):
     return Response({"favorites": data})
 
 
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def remove_favorite(request, song_id):
-    try:
-        favorite = Favorite.objects.get(user=request.user, id=song_id)
-        favorite.delete()
-        return Response({"message": "Removed from favorites."})
-    except Favorite.DoesNotExist:
-        return Response({"error": "Song not found in favorites."}, status=404)
 
