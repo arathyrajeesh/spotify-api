@@ -9,7 +9,6 @@ from .models import Favorite
 from .serializers import FavoriteSerializer
 
 
-# --- Get Spotify Access Token ---
 def get_spotify_token():
     auth_string = f"{settings.SPOTIFY_CLIENT_ID}:{settings.SPOTIFY_CLIENT_SECRET}"
     b64_auth = base64.b64encode(auth_string.encode()).decode()
@@ -23,7 +22,6 @@ def get_spotify_token():
     return response.json()["access_token"]
 
 
-# --- Search Endpoint ---
 @api_view(['GET'])
 def search_song(request):
     query = request.GET.get('q')
@@ -31,7 +29,6 @@ def search_song(request):
         return Response({"error": "Please provide ?q=search_term"}, status=400)
 
     try:
-        # --- Spotify Search ---
         token = get_spotify_token()
         spotify_headers = {"Authorization": f"Bearer {token}"}
         spotify_url = f"https://api.spotify.com/v1/search?q={query}&type=track&limit=1"
@@ -55,7 +52,6 @@ def search_song(request):
             "album_art": track["album"]["images"][0]["url"] if track["album"]["images"] else None,
         }
 
-        # --- Genius Search ---
         genius_headers = {"Authorization": f"Bearer {settings.GENIUS_ACCESS_TOKEN}"}
         genius_url = f"https://api.genius.com/search?q={song_name} {artist_name}"
         genius_response = requests.get(genius_url, headers=genius_headers)
@@ -74,7 +70,6 @@ def search_song(request):
 
 
 
-# --- Add Favorite Song (Authenticated) ---
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_favorite(request):
@@ -82,7 +77,6 @@ def add_favorite(request):
     serializer = FavoriteSerializer(data=request.data)
 
     if serializer.is_valid():
-        # Check if already added
         if Favorite.objects.filter(user=user, song=serializer.validated_data['song']).exists():
             return Response({"message": "This song is already in your favorites."}, status=status.HTTP_200_OK)
 
@@ -113,11 +107,3 @@ def remove_favorite(request, song_id):
     except Favorite.DoesNotExist:
         return Response({"error": "Song not found in favorites."}, status=404)
 
-
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def search_favorites(request):
-    query = request.GET.get('q', '')
-    favorites = Favorite.objects.filter(user=request.user, song__icontains=query)
-    data = [{"song": f.song, "artist": f.artist, "album": f.album} for f in favorites]
-    return Response(data)
