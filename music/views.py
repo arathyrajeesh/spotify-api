@@ -73,17 +73,15 @@ def search_song(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def add_favorite(request):
-    user = request.user
     serializer = FavoriteSerializer(data=request.data)
-
     if serializer.is_valid():
-        if Favorite.objects.filter(user=user, song=serializer.validated_data['song']).exists():
-            return Response({"message": "This song is already in your favorites."}, status=status.HTTP_200_OK)
-
-        serializer.save(user=user)
-        return Response({"message": "Song added to favorites successfully!"}, status=status.HTTP_201_CREATED)
-
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        song = serializer.validated_data['song']
+        artist = serializer.validated_data['artist']
+        if Favorite.objects.filter(user=request.user, song=song, artist=artist).exists():
+            return Response({"message": "Already added to favorites."}, status=200)
+        serializer.save(user=request.user)
+        return Response({"message": "Added to favorites!"}, status=201)
+    return Response(serializer.errors, status=400)
 
 
 @api_view(['GET'])
@@ -91,10 +89,30 @@ def add_favorite(request):
 def list_favorites(request):
     favorites = Favorite.objects.filter(user=request.user)
     data = [
-        {"song": fav.song, "artist": fav.artist}
+        {
+            "id": fav.id,   
+            "song": fav.song,
+            "artist": fav.artist,
+            "album": fav.album,
+            "added_at": fav.added_at
+        }
         for fav in favorites
     ]
     return Response({"favorites": data})
 
 
-
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def remove_favorite(request, favorite_id):
+    try:
+        favorite = Favorite.objects.get(id=favorite_id, user=request.user)
+        favorite.delete()
+        return Response(
+            {"message": "Favorite removed successfully."},
+            status=status.HTTP_204_NO_CONTENT
+        )
+    except Favorite.DoesNotExist:
+        return Response(
+            {"error": "Favorite not found."},
+            status=status.HTTP_404_NOT_FOUND
+        )

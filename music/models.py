@@ -9,7 +9,7 @@ class Favorite(models.Model):
     added_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('user', 'song')  # Each user can favorite a song once
+        unique_together = ('user', 'song')  
 
     def __str__(self):
         return f"{self.song} - {self.user.username}"
