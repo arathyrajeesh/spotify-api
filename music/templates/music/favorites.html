@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const songCard = this.closest('.song-card');
 
             if (confirm('Are you sure you want to remove this from favorites?')) {
-                fetch(`/api/api/favorites/${favoriteId}/remove/`, {
+                fetch(`/api/favorites/${favoriteId}/remove/`, {
                     method: 'DELETE',
                     headers: {
                         'Content-Type': 'application/json',

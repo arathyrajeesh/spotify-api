@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function() {
         noResults.style.display = 'none';
         resultsList.innerHTML = '';
 
-        fetch('/api/api/search/?q=' + encodeURIComponent(query), {
+        fetch('/api/search/?q=' + encodeURIComponent(query), {
             method: 'GET',
             headers: {
                 'X-CSRFToken': csrftoken
@@ -185,7 +185,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function addToFavorites(song) {
-        fetch('/api/api/favorites/add/', {
+        fetch('/api/favorites/add/', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -201,18 +201,31 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => {
             if (response.status === 401) {
                 window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
-                return;
+                throw new Error('Redirecting to login...');
+            }
+            if (!response.ok) {
+                return response.text().then(text => {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText} - ${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
-            if (data.message) {
-                alert(data.message);
+            if (data && data.message) {
+                alert(data.message + '\n\nRedirecting to your favorites...');
+                // Redirect to favorites page after successful addition
+                setTimeout(() => {
+                    window.location.href = '/favorites/';
+                }, 500); // Small delay to show the alert
+            } else {
+                throw new Error('Invalid response from server');
             }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('Error adding to favorites');
+            if (error.message !== 'Redirecting to login...') {
+                alert('Error adding to favorites: ' + error.message);
+            }
         });
     }
 

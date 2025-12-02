@@ -10,6 +10,8 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import authentication_classes
 from .models import Favorite
 from .serializers import FavoriteSerializer
 from .models import SearchHistory
@@ -29,19 +31,18 @@ def get_spotify_token():
 
 
 @api_view(['GET'])
+@authentication_classes([SessionAuthentication])
 def search_song(request):
-    # Temporarily remove auth check for debugging
-    # if not request.user.is_authenticated:
-    #     return Response({"error": "Authentication required"}, status=401)
+    if not request.user.is_authenticated:
+        return Response({"error": "Authentication required"}, status=401)
 
     query = request.GET.get('q')
     if not query:
         return Response({"error": "Please provide ?q=search_term"}, status=400)
 
     try:
-        # Temporarily comment out for debugging
-        # SearchHistory.objects.create(user=request.user, query=query)
-        pass
+        if request.user.is_authenticated:
+            SearchHistory.objects.create(user=request.user, query=query)
 
         token = get_spotify_token()
         spotify_headers = {"Authorization": f"Bearer {token}"}
@@ -101,34 +102,24 @@ def search_song(request):
 
 
 @api_view(['POST'])
+@authentication_classes([SessionAuthentication])
 def add_favorite(request):
-    # Temporarily remove auth check for debugging
-    # if not request.user.is_authenticated:
-    #     return Response({"error": "Authentication required"}, status=401)
-
-    # For testing without authentication, create or get a test user
     if not request.user.is_authenticated:
-        from django.contrib.auth.models import User
-        test_user, created = User.objects.get_or_create(
-            username='testuser',
-            defaults={'email': 'test@example.com'}
-        )
-        user = test_user
-    else:
-        user = request.user
+        return Response({"error": "Authentication required"}, status=401)
 
     serializer = FavoriteSerializer(data=request.data)
     if serializer.is_valid():
         song = serializer.validated_data['song']
         artist = serializer.validated_data['artist']
-        if Favorite.objects.filter(user=user, song=song, artist=artist).exists():
+        if Favorite.objects.filter(user=request.user, song=song, artist=artist).exists():
             return Response({"message": "Already added to favorites."}, status=200)
-        serializer.save(user=user)
+        serializer.save(user=request.user)
         return Response({"message": "Added to favorites!"}, status=201)
     return Response(serializer.errors, status=400)
 
 
 @api_view(['GET'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def list_favorites(request):
     favorites = Favorite.objects.filter(user=request.user)
@@ -146,24 +137,13 @@ def list_favorites(request):
 
 
 @api_view(['DELETE'])
+@authentication_classes([SessionAuthentication])
 def remove_favorite(request, favorite_id):
-    # Temporarily remove auth check for debugging
-    # if not request.user.is_authenticated:
-    #     return Response({"error": "Authentication required"}, status=401)
-
-    # For testing without authentication, use test user
     if not request.user.is_authenticated:
-        from django.contrib.auth.models import User
-        test_user, created = User.objects.get_or_create(
-            username='testuser',
-            defaults={'email': 'test@example.com'}
-        )
-        user = test_user
-    else:
-        user = request.user
+        return Response({"error": "Authentication required"}, status=401)
 
     try:
-        favorite = Favorite.objects.get(id=favorite_id, user=user)
+        favorite = Favorite.objects.get(id=favorite_id, user=request.user)
         favorite.delete()
         return Response(
             {"message": "Favorite removed successfully."},
@@ -176,6 +156,7 @@ def remove_favorite(request, favorite_id):
         )
         
 @api_view(['GET'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def list_search_history(request):
     history = SearchHistory.objects.filter(user=request.user)[:10]
@@ -187,6 +168,7 @@ def list_search_history(request):
 
 
 @api_view(['DELETE'])
+@authentication_classes([SessionAuthentication])
 @permission_classes([IsAuthenticated])
 def clear_search_history(request):
     SearchHistory.objects.filter(user=request.user).delete()
@@ -205,16 +187,7 @@ def search_page(request):
 
 @login_required
 def favorites_page(request):
-    # For testing, if user is not authenticated, show test user's favorites
-    if not request.user.is_authenticated:
-        from django.contrib.auth.models import User
-        test_user, created = User.objects.get_or_create(
-            username='testuser',
-            defaults={'email': 'test@example.com'}
-        )
-        favorites = Favorite.objects.filter(user=test_user)
-    else:
-        favorites = Favorite.objects.filter(user=request.user)
+    favorites = Favorite.objects.filter(user=request.user)
     return render(request, 'music/favorites.html', {'favorites': favorites})
 
 def login_page(request):
