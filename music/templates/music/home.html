@@ -1,0 +1,32 @@
+{% extends 'music/base.html' %}
+
+{% block title %}Home - SongFinder{% endblock %}
+
+{% block page_title %}Welcome to SongFinder{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Discover Your Music</h2>
+    <p>Search for songs, add them to your favorites, and build your personal music collection.</p>
+    <a href="{% url 'search_page' %}" class="btn btn-primary">
+        <i class="fas fa-search"></i> Start Searching
+    </a>
+</div>
+
+<div class="card">
+    <h2>Quick Actions</h2>
+    <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+        <a href="{% url 'search_page' %}" class="btn btn-secondary">
+            <i class="fas fa-search"></i> Search Songs
+        </a>
+        <a href="{% url 'favorites_page' %}" class="btn btn-secondary">
+            <i class="fas fa-heart"></i> View Favorites
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Recent Activity</h2>
+    <p>Your recent searches and favorites will appear here.</p>
+</div>
+{% endblock %}

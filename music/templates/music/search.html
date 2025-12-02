@@ -1,0 +1,243 @@
+{% extends 'music/base.html' %}
+
+{% block title %}Search - SongFinder{% endblock %}
+
+{% block page_title %}Search for Songs{% endblock %}
+
+{% block content %}
+<div class="search-container">
+    <input type="text" id="search-input" class="search-bar" placeholder="Search for songs, artists, or albums..." autocomplete="off">
+    <button id="search-btn" class="btn btn-primary" style="margin-left: 12px;">
+        <i class="fas fa-search"></i> Search
+    </button>
+</div>
+
+<!-- Audio Player -->
+<div id="audio-player" class="audio-player" style="display: none;">
+    <div class="player-content">
+        <img id="player-album-art" class="player-album-art" src="" alt="Album Art">
+        <div class="player-info">
+            <div id="player-song-title" class="player-song-title"></div>
+            <div id="player-artist" class="player-artist"></div>
+        </div>
+        <audio id="audio-element" controls preload="none">
+            Your browser does not support the audio element.
+        </audio>
+        <button id="close-player" class="btn btn-secondary">×</button>
+    </div>
+</div>
+
+<div id="results-container">
+    <div id="loading" class="loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Searching...</p>
+    </div>
+
+    <div id="no-results" style="text-align: center; display: none;">
+        <p>No results found. Try a different search term.</p>
+    </div>
+
+    <div id="results-list"></div>
+</div>
+
+<!-- Song Card Template -->
+<template id="song-card-template">
+    <div class="song-card">
+        <img class="song-image" src="" alt="Album Art">
+        <div class="song-info">
+            <div class="song-title"></div>
+            <div class="song-artist"></div>
+            <div class="song-album"></div>
+        </div>
+        <div class="song-actions">
+            <button class="btn btn-primary play-btn">
+                <i class="fas fa-play"></i> Play
+            </button>
+            <button class="btn btn-secondary favorite-btn">
+                <i class="fas fa-heart"></i> Add to Favorites
+            </button>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('search-input');
+    const searchBtn = document.getElementById('search-btn');
+    const resultsContainer = document.getElementById('results-container');
+    const resultsList = document.getElementById('results-list');
+    const loading = document.getElementById('loading');
+    const noResults = document.getElementById('no-results');
+    const template = document.getElementById('song-card-template');
+
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    function searchSongs(query) {
+        if (!query.trim()) return;
+
+        loading.style.display = 'block';
+        noResults.style.display = 'none';
+        resultsList.innerHTML = '';
+
+        fetch('/api/api/search/?q=' + encodeURIComponent(query), {
+            method: 'GET',
+            headers: {
+                'X-CSRFToken': csrftoken
+            },
+            credentials: 'same-origin'
+        })
+        .then(response => {
+            if (response.status === 401) {
+                // User not authenticated, redirect to login
+                window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+            return response.json();
+        })
+        .then(data => {
+            loading.style.display = 'none';
+
+            if (data.error) {
+                noResults.style.display = 'block';
+                noResults.innerHTML = `<p>Error: ${data.error}</p><p>Details: ${data.details || data.type || 'Unknown error'}</p>`;
+                return;
+            }
+
+            if (data.message && !data.song) {
+                noResults.style.display = 'block';
+                noResults.innerHTML = `<p>${data.message}</p><p>Query: "${query}"</p>`;
+                return;
+            }
+
+            displaySong(data);
+        })
+        .catch(error => {
+            loading.style.display = 'none';
+            noResults.style.display = 'block';
+            noResults.innerHTML = `<p>Network error: ${error.message}</p>`;
+            console.error('Error:', error);
+        });
+    }
+
+    function displaySong(song) {
+        const songCard = template.content.cloneNode(true);
+
+        songCard.querySelector('.song-image').src = song.album_art || '/static/music/images/default-album.png';
+        songCard.querySelector('.song-title').textContent = song.song;
+        songCard.querySelector('.song-artist').textContent = song.artist;
+        songCard.querySelector('.song-album').textContent = song.album;
+
+        const playBtn = songCard.querySelector('.play-btn');
+        const favoriteBtn = songCard.querySelector('.favorite-btn');
+
+        if (song.preview_url) {
+            playBtn.addEventListener('click', () => playSong(song));
+        } else {
+            playBtn.disabled = true;
+            playBtn.innerHTML = '<i class="fas fa-ban"></i> No Preview';
+        }
+
+        favoriteBtn.addEventListener('click', () => addToFavorites(song));
+
+        resultsList.appendChild(songCard);
+    }
+
+    function playSong(songData) {
+        const player = document.getElementById('audio-player');
+        const audioElement = document.getElementById('audio-element');
+        const albumArt = document.getElementById('player-album-art');
+        const songTitle = document.getElementById('player-song-title');
+        const artist = document.getElementById('player-artist');
+
+        if (songData.preview_url) {
+            // Update player info
+            albumArt.src = songData.album_art || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiBmaWxsPSIjMjgyODI4Ii8+CjxjaXJjbGUgY3g9IjMwIiBjeT0iMjUiIHI9IjEwIiBmaWxsPSIjNDA0MDQwIi8+CjxwYXRoIGQ9Ik0yMCA0NWwxMCAxMHYtMTBMMzAgMzB2MTBsMTAgMTBMMzAgNDB2MTBsLTEwLTEweiIgZmlsbD0iIzQwNDA0MCIvPgo8L3N2Zz4=';
+            songTitle.textContent = songData.song;
+            artist.textContent = songData.artist;
+
+            // Set audio source and play
+            audioElement.src = songData.preview_url;
+            audioElement.load();
+            audioElement.play();
+
+            // Show player
+            player.style.display = 'block';
+        } else {
+            alert('No preview available for this song.');
+        }
+    }
+
+    function addToFavorites(song) {
+        fetch('/api/api/favorites/add/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                song: song.song,
+                artist: song.artist,
+                album: song.album
+            })
+        })
+        .then(response => {
+            if (response.status === 401) {
+                window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
+                return;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.message) {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error adding to favorites');
+        });
+    }
+
+    // Event listeners
+    searchBtn.addEventListener('click', () => {
+        searchSongs(searchInput.value);
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchSongs(searchInput.value);
+        }
+    });
+
+    // Close player button
+    const closeBtn = document.getElementById('close-player');
+    closeBtn.addEventListener('click', () => {
+        const player = document.getElementById('audio-player');
+        const audioElement = document.getElementById('audio-element');
+
+        // Stop audio and hide player
+        audioElement.pause();
+        audioElement.currentTime = 0;
+        player.style.display = 'none';
+    });
+});
+</script>
+{% endblock %}

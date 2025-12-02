@@ -1,0 +1,97 @@
+{% extends 'music/base.html' %}
+
+{% block title %}Favorites - SongFinder{% endblock %}
+
+{% block page_title %}Your Favorite Songs{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Your Favorites</h2>
+    {% if favorites %}
+        <div id="favorites-list">
+            {% for favorite in favorites %}
+            <div class="song-card" data-id="{{ favorite.id }}">
+                <div class="song-info">
+                    <div class="song-title">{{ favorite.song }}</div>
+                    <div class="song-artist">{{ favorite.artist }}</div>
+                    {% if favorite.album %}
+                        <div class="song-album">{{ favorite.album }}</div>
+                    {% endif %}
+                    <small style="color: var(--spotify-light-gray);">
+                        Added {{ favorite.added_at|date:"M d, Y" }}
+                    </small>
+                </div>
+                <div class="song-actions">
+                    <button class="btn btn-danger remove-btn" data-id="{{ favorite.id }}">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>You haven't added any favorites yet. <a href="{% url 'search_page' %}">Start searching</a> to add some!</p>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    const csrftoken = getCookie('csrftoken');
+
+    // Add event listeners to remove buttons
+    document.querySelectorAll('.remove-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const favoriteId = this.getAttribute('data-id');
+            const songCard = this.closest('.song-card');
+
+            if (confirm('Are you sure you want to remove this from favorites?')) {
+                fetch(`/api/api/favorites/${favoriteId}/remove/`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrftoken
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (response.status === 401) {
+                        window.location.href = '/login/?next=' + encodeURIComponent(window.location.pathname);
+                        return;
+                    }
+                    if (response.status === 204) {
+                        songCard.remove();
+                        // Check if no favorites left
+                        if (document.querySelectorAll('.song-card').length === 0) {
+                            location.reload();
+                        }
+                    } else {
+                        alert('Error removing favorite');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error removing favorite');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
